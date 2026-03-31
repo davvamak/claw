@@ -7,6 +7,7 @@
 import puppeteer from 'puppeteer';
 import * as cheerio from 'cheerio';
 import { writeFileSync, mkdirSync } from 'fs';
+import { execSync } from 'child_process';
 
 const browser = await puppeteer.launch({
   headless: 'new',
@@ -14,6 +15,55 @@ const browser = await puppeteer.launch({
 });
 
 const articles = [];
+
+function fetchRSS(url) {
+  try {
+    const xml = execSync(`curl -sL "${url}" -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" --max-time 15`, { encoding: 'utf-8' });
+    const items = [];
+    
+    // Try Atom format first (Reddit uses Atom)
+    const entryMatches = xml.match(/<entry[^>]*>[\s\S]*?<\/entry>/g) || [];
+    
+    for (const entry of entryMatches.slice(0, 8)) {
+      const title = (entry.match(/<title[^>]*>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/i) || [])[1]?.trim() || '';
+      const linkMatch = entry.match(/<link[^>]*href="([^"]+)"[^>]*>/i);
+      const link = linkMatch ? linkMatch[1] : '';
+      
+      if (title && link) {
+        items.push({
+          title: title.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>'),
+          url: link,
+          source: new URL(url).hostname.replace('www.', ''),
+          type: 'reddit'
+        });
+      }
+    }
+    
+    // Fallback to RSS format
+    if (items.length === 0) {
+      const itemMatches = xml.match(/<item[^>]*>[\s\S]*?<\/item>/g) || [];
+      
+      for (const item of itemMatches.slice(0, 8)) {
+        const title = (item.match(/<title[^>]*>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/i) || [])[1]?.trim() || '';
+        const link = (item.match(/<link[^>]*>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/link>/i) || [])[1]?.trim() || '';
+        
+        if (title && link) {
+          items.push({
+            title: title.replace(/<[^>]+>/g, ''),
+            url: link.replace(/<[^>]+>/g, ''),
+            source: new URL(url).hostname.replace('www.', ''),
+            type: 'reddit'
+          });
+        }
+      }
+    }
+    
+    return items;
+  } catch (e) {
+    console.log(`     ✗ RSS failed: ${e.message}`);
+    return [];
+  }
+}
 
 async function fetchHTML(url) {
   const page = await browser.newPage();
@@ -177,7 +227,17 @@ async function scrapeESPN() {
 // Main execution
 console.log('🔍 Advanced Researcher starting...\n');
 
-await scrapeReddit();
+console.log('  🔴 Fetching Reddit RSS r/LiverpoolFC...');
+const redditLFC = fetchRSS('https://www.reddit.com/r/LiverpoolFC/.rss');
+console.log(`     ✓ Found ${redditLFC.length} posts`);
+articles.push(...redditLFC.map(p => ({ ...p, section: 'Liverpool FC' })));
+
+console.log('  🔴 Fetching Reddit RSS r/soccer...');
+const redditSoccer = fetchRSS('https://www.reddit.com/r/soccer/.rss');
+const soccerLFC = redditSoccer.filter(p => p.title.match(/liverpool|lfc|salah|klopp/i)).slice(0, 5);
+console.log(`     ✓ Found ${soccerLFC.length} Liverpool-related posts`);
+articles.push(...soccerLFC.map(p => ({ ...p, section: 'EPL' })));
+
 await scrapeBBC();
 await scrapeEcho();
 await scrapeCityNews();

@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "duckduckgo": {
+      "command": "npx",
+      "args": ["-y", "@zhafron/mcp-web-search"],
+      "env": {}
+    }
+  }
+}
