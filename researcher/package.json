@@ -1,0 +1,10 @@
+{
+  "name": "kilobot-researcher",
+  "version": "1.0.0",
+  "description": "Daily news researcher and dashboard for Liverpool-focused content",
+  "type": "module",
+  "scripts": {
+    "gather": "node src/gather.js",
+    "serve": "python3 -m http.server 8080 --directory dashboard"
+  }
+}

@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kilobot Researcher - Daily Digest</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    :root {
+      --bg: #0f0f23;
+      --bg-card: #1a1a2e;
+      --bg-hover: #252540;
+      --text: #e0e0e0;
+      --text-muted: #888;
+      --accent: #c8102e; /* Liverpool red */
+      --accent-gold: #f6eb61;
+      --border: #2a2a4a;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+    
+    header {
+      background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg) 100%);
+      border-bottom: 2px solid var(--accent);
+      padding: 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    
+    .header-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    
+    h1 {
+      font-size: 1.8rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .squid {
+      font-size: 2rem;
+    }
+    
+    .date-picker {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    input[type="date"] {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-size: 1rem;
+    }
+    
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+    
+    .section {
+      margin-bottom: 2rem;
+    }
+    
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid var(--border);
+    }
+    
+    .section-title {
+      font-size: 1.4rem;
+      color: var(--accent-gold);
+    }
+    
+    .section-count {
+      background: var(--accent);
+      color: white;
+      padding: 0.25rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    
+    .articles-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+      gap: 1rem;
+    }
+    
+    .article-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    
+    .article-card:hover {
+      background: var(--bg-hover);
+      border-color: var(--accent);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(200, 16, 46, 0.2);
+    }
+    
+    .article-source {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    
+    .source-icon {
+      width: 16px;
+      height: 16px;
+      border-radius: 3px;
+    }
+    
+    .article-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      line-height: 1.4;
+      color: var(--text);
+    }
+    
+    .article-snippet {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    
+    .article-meta {
+      display: flex;
+      gap: 1rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: auto;
+      padding-top: 0.5rem;
+    }
+    
+    .loading, .error, .empty {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--text-muted);
+    }
+    
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 1rem;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .refresh-btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: opacity 0.2s;
+    }
+    
+    .refresh-btn:hover {
+      opacity: 0.9;
+    }
+    
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+      margin-top: 2rem;
+    }
+    
+    @media (max-width: 768px) {
+      .articles-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .header-content {
+        flex-direction: column;
+        text-align: center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-content">
+      <h1><span class="squid">🦑</span> Kilobot Researcher</h1>
+      <div class="date-picker">
+        <label for="date-select">Date:</label>
+        <input type="date" id="date-select">
+        <button class="refresh-btn" onclick="loadData()">Refresh</button>
+      </div>
+    </div>
+  </header>
+  
+  <main id="content">
+    <div class="loading">
+      <div class="spinner"></div>
+      <p>Loading your daily digest...</p>
+    </div>
+  </main>
+  
+  <footer>
+    <p>🦑 Kilobot Researcher | Daily Liverpool Digest | Auto-updates every morning</p>
+  </footer>
+
+  <script>
+    // Set today's date as default
+    const dateInput = document.getElementById('date-select');
+    dateInput.valueAsDate = new Date();
+    
+    async function loadData() {
+      const content = document.getElementById('content');
+      const selectedDate = dateInput.value;
+      
+      content.innerHTML = `
+        <div class="loading">
+          <div class="spinner"></div>
+          <p>Loading digest for ${selectedDate}...</p>
+        </div>
+      `;
+      
+      try {
+        const response = await fetch(`data/${selectedDate}.json`);
+        
+        if (!response.ok) {
+          throw new Error('No data available for this date');
+        }
+        
+        const report = await response.json();
+        renderReport(report);
+      } catch (error) {
+        content.innerHTML = `
+          <div class="error">
+            <h2>No digest found</h2>
+            <p>${error.message}</p>
+            <p style="margin-top: 1rem; font-size: 0.9rem;">
+              Try selecting a different date or check back tomorrow morning.
+            </p>
+          </div>
+        `;
+      }
+    }
+    
+    function renderReport(report) {
+      const content = document.getElementById('content');
+      
+      if (!report.sections || report.sections.length === 0) {
+        content.innerHTML = `
+          <div class="empty">
+            <h2>No articles found</h2>
+            <p>The researcher didn't find any news for this date.</p>
+          </div>
+        `;
+        return;
+      }
+      
+      const html = report.sections.map(section => `
+        <section class="section">
+          <div class="section-header">
+            <h2 class="section-title">${section.title}</h2>
+            <span class="section-count">${section.articles.length}</span>
+          </div>
+          <div class="articles-grid">
+            ${section.articles.map(article => `
+              <a href="${article.url}" target="_blank" rel="noopener" class="article-card">
+                <div class="article-source">
+                  <span>${article.source}</span>
+                </div>
+                <h3 class="article-title">${escapeHtml(article.title)}</h3>
+                <p class="article-snippet">${escapeHtml(article.snippet)}</p>
+                <div class="article-meta">
+                  <span>🕐 ${formatTime(article.timestamp)}</span>
+                </div>
+              </a>
+            `).join('')}
+          </div>
+        </section>
+      `).join('');
+      
+      content.innerHTML = html;
+    }
+    
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    function formatTime(timestamp) {
+      const date = new Date(timestamp);
+      return date.toLocaleTimeString('en-GB', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+    }
+    
+    // Load on date change
+    dateInput.addEventListener('change', loadData);
+    
+    // Initial load
+    loadData();
+  </script>
+</body>
+</html>
