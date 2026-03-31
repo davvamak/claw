@@ -101,14 +101,18 @@ async function gatherNews() {
     console.log(`     ✓ Found ${section.articles.length} articles`);
   }
 
-  // Save report
-  const dataDir = '/root/.openclaw/workspace/researcher/data';
-  mkdirSync(dataDir, { recursive: true });
+  // Save report to both workspace and dashboard data folders
+  const dataDirs = [
+    '/root/.openclaw/workspace/researcher/data',
+    '/root/.openclaw/workspace/researcher/dashboard/data'
+  ];
   
-  const filename = `${dataDir}/${date}.json`;
-  writeFileSync(filename, JSON.stringify(report, null, 2));
-  
-  console.log(`✅ Report saved: ${filename}`);
+  for (const dataDir of dataDirs) {
+    mkdirSync(dataDir, { recursive: true });
+    const filename = `${dataDir}/${date}.json`;
+    writeFileSync(filename, JSON.stringify(report, null, 2));
+    console.log(`✅ Report saved: ${filename}`);
+  }
   console.log(`   Total sections: ${report.sections.length}`);
   console.log(`   Total articles: ${report.sections.reduce((a, s) => a + s.articles.length, 0)}`);
   
