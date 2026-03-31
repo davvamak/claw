@@ -1,127 +1,100 @@
 #!/usr/bin/env node
-/**
- * Researcher Agent - Daily News Gatherer
- * Fetches Liverpool-focused news from multiple sources
- */
-
-import { execSync } from 'child_process';
 import { writeFileSync, mkdirSync } from 'fs';
-import { dirname } from 'path';
+import { execSync } from 'child_process';
 
-const TOPICS = [
-  { name: 'Liverpool FC', queries: ['Liverpool FC news today', 'LFC transfer news', 'Liverpool match results'] },
-  { name: 'EPL', queries: ['Premier League news today', 'EPL results fixtures', 'Premier League table'] },
-  { name: 'Liverpool City', queries: ['Liverpool city news', 'Merseyside news today', 'Liverpool local news'] },
+const FEEDS = [
+  {
+    section: 'Liverpool FC',
+    sources: [
+      { name: 'BBC Sport', url: 'https://feeds.bbci.co.uk/sport/football/teams/liverpool/rss.xml' },
+      { name: 'ESPN', url: 'https://www.espn.com/espn/rss/news' },
+      { name: 'Goal.com', url: 'https://www.goal.com/feeds/en/news' }
+    ]
+  },
+  {
+    section: 'EPL',
+    sources: [
+      { name: 'BBC Football', url: 'https://feeds.bbci.co.uk/sport/football/rss.xml' },
+      { name: 'Sky Sports', url: 'https://www.skysports.com/rss/11095' }
+    ]
+  },
+  {
+    section: 'Liverpool City',
+    sources: [
+      { name: 'Liverpool Echo', url: 'https://www.liverpoolecho.co.uk/?service=rss' },
+      { name: 'BBC Liverpool', url: 'https://feeds.bbci.co.uk/news/england/merseyside/rss.xml' }
+    ]
+  }
 ];
 
-const SOURCES = {
-  web: true,
-  // Social sources (we'll use web search to find relevant posts)
-  social: ['twitter.com', 'reddit.com', 'facebook.com', 'instagram.com']
-};
-
-function runSearch(query, count = 5) {
+function fetchRSS(url) {
   try {
-    // Using openclaw's web_search via CLI
-    const result = execSync(
-      `openclaw tools web_search "${query}" --count ${count}`,
-      { encoding: 'utf-8', timeout: 30000 }
-    );
-    return JSON.parse(result);
+    const xml = execSync(`curl -sL "${url}" -A "Mozilla/5.0" --max-time 10`, { encoding: 'utf-8' });
+    const items = [];
+    const itemMatches = xml.match(/<item[^>]*>[\s\S]*?<\/item>/g) || [];
+    
+    for (const item of itemMatches.slice(0, 5)) {
+      const title = (item.match(/<title[^>]*>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/i) || [])[1]?.trim() || 'No title';
+      const link = (item.match(/<link[^>]*>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/link>/i) || [])[1]?.trim() || '';
+      const desc = (item.match(/<description[^>]*>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/description>/i) || [])[1]?.trim() || '';
+      const pubDate = (item.match(/<pubDate[^>]*>([\s\S]*?)<\/pubDate>/i) || [])[1]?.trim() || '';
+      
+      if (title && link) {
+        items.push({
+          title: title.replace(/<[^>]+>/g, ''),
+          url: link.replace(/<[^>]+>/g, ''),
+          snippet: desc.replace(/<[^>]+>/g, '').substring(0, 200) + '...',
+          source: new URL(url).hostname.replace('www.', ''),
+          timestamp: pubDate || new Date().toISOString()
+        });
+      }
+    }
+    return items;
   } catch (e) {
-    console.error(`Search failed for "${query}":`, e.message);
+    console.error(`  ✗ Failed: ${url} - ${e.message}`);
     return [];
   }
-}
-
-function runFetch(url) {
-  try {
-    const result = execSync(
-      `openclaw tools web_fetch "${url}"`,
-      { encoding: 'utf-8', timeout: 30000 }
-    );
-    return result;
-  } catch (e) {
-    return null;
-  }
-}
-
-function generateId() {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2);
 }
 
 function todayStr() {
   return new Date().toISOString().split('T')[0];
 }
 
-async function gatherNews() {
-  const date = todayStr();
-  const report = {
-    date,
-    generatedAt: new Date().toISOString(),
-    sections: []
-  };
+console.log('🔍 Researcher Agent starting...\n');
 
-  console.log(`🔍 Researcher Agent starting daily roundup for ${date}...`);
+const report = {
+  date: todayStr(),
+  generatedAt: new Date().toISOString(),
+  sections: []
+};
 
-  for (const topic of TOPICS) {
-    console.log(`  📰 Gathering: ${topic.name}`);
-    const section = {
-      id: generateId(),
-      title: topic.name,
-      articles: []
-    };
-
-    // Run all queries for this topic
-    for (const query of topic.queries) {
-      const results = runSearch(query, 3);
-      
-      for (const result of results) {
-        // Skip if we already have this URL
-        if (section.articles.find(a => a.url === result.url)) continue;
-
-        // Fetch content for better summaries
-        const content = runFetch(result.url);
-        
-        section.articles.push({
-          id: generateId(),
-          title: result.title,
-          url: result.url,
-          snippet: result.snippet,
-          source: new URL(result.url).hostname.replace('www.', ''),
-          fetched: !!content,
-          timestamp: new Date().toISOString()
-        });
-      }
-    }
-
-    // Deduplicate and limit
-    section.articles = section.articles.slice(0, 8);
-    report.sections.push(section);
-    console.log(`     ✓ Found ${section.articles.length} articles`);
-  }
-
-  // Save report to both workspace and dashboard data folders
-  const dataDirs = [
-    '/root/.openclaw/workspace/researcher/data',
-    '/root/.openclaw/workspace/researcher/dashboard/data'
-  ];
+for (const topic of FEEDS) {
+  console.log(`📰 ${topic.section}`);
+  const section = { title: topic.section, articles: [] };
   
-  for (const dataDir of dataDirs) {
-    mkdirSync(dataDir, { recursive: true });
-    const filename = `${dataDir}/${date}.json`;
-    writeFileSync(filename, JSON.stringify(report, null, 2));
-    console.log(`✅ Report saved: ${filename}`);
+  for (const source of topic.sources) {
+    const items = fetchRSS(source.url);
+    console.log(`  ✓ ${source.name}: ${items.length} articles`);
+    section.articles.push(...items);
   }
-  console.log(`   Total sections: ${report.sections.length}`);
-  console.log(`   Total articles: ${report.sections.reduce((a, s) => a + s.articles.length, 0)}`);
   
-  return report;
+  // Deduplicate by URL
+  const seen = new Set();
+  section.articles = section.articles.filter(a => {
+    if (seen.has(a.url)) return false;
+    seen.add(a.url);
+    return true;
+  }).slice(0, 8);
+  
+  report.sections.push(section);
 }
 
-// Run if executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  gatherNews().catch(console.error);
+// Save to both locations
+const dataDirs = ['/root/.openclaw/workspace/researcher/data', '/root/.openclaw/workspace/researcher/dashboard/data'];
+for (const dir of dataDirs) {
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(`${dir}/${todayStr()}.json`, JSON.stringify(report, null, 2));
 }
 
-export { gatherNews, todayStr };
+const total = report.sections.reduce((a, s) => a + s.articles.length, 0);
+console.log(`\n✅ Saved ${total} articles to dashboard`);
